@@ -1,6 +1,5 @@
 """
 Point d'entrée principal du Bot Telegram
-Gère le serveur web pour Render.com et les commandes Telegram
 """
 import os
 import sys
@@ -26,50 +25,44 @@ bot_logic = BotLogic(storage)
 
 @app.route('/')
 def home():
-    """Route principale pour vérifier que le serveur fonctionne"""
     return f"""
     <h1>🤖 Bot d'Analyse d'Écarts Actif</h1>
-    <p>🕐 Heure actuelle: {datetime.now().strftime('%H:%M:%S')}</p>
+    <p>🕐 Heure: {datetime.now().strftime('%H:%M:%S')}</p>
     <p>📅 {get_current_journee().replace('_', ' ')}</p>
-    <p>🎯 Canal Source: {storage.get_source_channel()}</p>
-    <p>📤 Canal Dest: {storage.get_dest_channel() or 'Non défini'}</p>
-    <p>✅ Status: En ligne sur le port {PORT}</p>
+    <p>🎯 Source: {storage.get_source_channel()}</p>
+    <p>📤 Dest: {storage.get_dest_channel()}</p>
+    <p>✅ Port: {PORT}</p>
     """
 
 @app.route('/health')
 def health():
-    """Route de health check pour Render"""
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
-# ============ COMMANDES TELEGRAM ============
+# ============ COMMANDES ============
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Commande /start - Démarrer le bot"""
     welcome_msg = """🌸 **Bienvenue sur le Bot d'Analyse d'Écarts** 🌸
 
-Je surveille les statistiques du canal source et analyse les écarts entre numéros.
+Je surveille les statistiques et analyse les écarts entre numéros.
 
-📋 **Commandes disponibles:**
-/start - Démarrer le bot
+📋 **Commandes:**
+/start - Démarrer
 /statut - Voir les IDs des canaux
-/test - Tester l'analyse (données de démo)
-/historique - Voir l'historique des écarts
-/restart - Redémarrer le bot
+/test - Tester l'analyse
+/historique - Voir l'historique
+/restart - Redémarrer
 
-⏰ Je vérifie automatiquement les messages à chaque heure pile.
+⏰ Analyse automatique à chaque heure pile.
 """
     await update.message.reply_text(welcome_msg, parse_mode='Markdown')
 
 async def statut_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Commande /statut - Voir les IDs des canaux"""
     source = storage.get_source_channel()
     dest = storage.get_dest_channel()
-    
     msg = bot_logic.format_statut(source, dest)
     await update.message.reply_text(msg, parse_mode='Markdown')
 
 async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Commande /test - Tester avec des données de démo"""
     test_data = {
         'total_games': 60,
         'categories': {
@@ -87,48 +80,40 @@ async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     analysis = analyzer.analyze_all_categories(test_data)
     hour_str = datetime.now().strftime('%H:%M')
-    
     msg = bot_logic.format_bilan(analysis, test_data['total_games'], hour_str)
     await update.message.reply_text(msg, parse_mode='Markdown')
 
 async def historique_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Commande /historique - Voir l'historique"""
     msg = bot_logic.format_historique()
     await update.message.reply_text(msg, parse_mode='Markdown')
 
 async def restart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Commande /restart - Redémarrer le bot"""
-    await update.message.reply_text("🔄 Redémarrage en cours...", parse_mode='Markdown')
-    
+    await update.message.reply_text("🔄 Redémarrage...", parse_mode='Markdown')
     try:
         storage.save_data()
-        await update.message.reply_text("✅ Bot redémarré avec succès!", parse_mode='Markdown')
+        await update.message.reply_text("✅ Bot redémarré!", parse_mode='Markdown')
     except Exception as e:
-        await update.message.reply_text(f"❌ Erreur lors du redémarrage: {str(e)}", parse_mode='Markdown')
+        await update.message.reply_text(f"❌ Erreur: {str(e)}", parse_mode='Markdown')
 
-# ============ GESTION DES MESSAGES DU CANAL SOURCE ============
+# ============ GESTION MESSAGES CANAL ============
 
 async def handle_channel_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Gère les messages du canal source"""
-    
     if update.channel_post and update.channel_post.chat_id == SOURCE_CHANNEL_ID:
         message_text = update.channel_post.text
         
         if not message_text or 'STATISTIQUES COMPLÈTES' not in message_text:
             return
         
-        print(f"📥 Message reçu du canal source à {datetime.now().strftime('%H:%M')}")
+        print(f"📥 Message reçu à {datetime.now().strftime('%H:%M')}")
         
         parsed_data = parser.parse_message(message_text)
-        
         if not parsed_data:
-            print("⚠️ Message incomplet - certaines catégories manquent")
+            print("⚠️ Message incomplet")
             return
         
-        print(f"✅ Message complet analysé: {len(parsed_data['categories'])} catégories")
+        print(f"✅ {len(parsed_data['categories'])} catégories trouvées")
         
         analysis = analyzer.analyze_all_categories(parsed_data)
-        
         now = datetime.now()
         hour_str = now.strftime('%H:%M')
         hour_key = now.strftime('%H:00')
@@ -142,36 +127,35 @@ async def handle_channel_message(update: Update, context: ContextTypes.DEFAULT_T
                      for cat, data in analysis.items()}
         storage.save_analysis(hour_key, gaps_data)
         
-        bilan_msg = bot_logic.format_bilan(
-            analysis, 
-            parsed_data['total_games'], 
-            hour_str,
-            comparison
-        )
+        bilan_msg = bot_logic.format_bilan(analysis, parsed_data['total_games'], hour_str, comparison)
         
         dest_channel = storage.get_dest_channel()
         if dest_channel:
             try:
-                await context.bot.send_message(
-                    chat_id=dest_channel,
-                    text=bilan_msg,
-                    parse_mode='Markdown'
-                )
-                print(f"✅ Bilan envoyé au canal {dest_channel}")
+                await context.bot.send_message(chat_id=dest_channel, text=bilan_msg, parse_mode='Markdown')
+                print(f"✅ Bilan envoyé")
             except Exception as e:
                 print(f"❌ Erreur envoi: {e}")
-        else:
-            print("⚠️ Canal de destination non défini")
 
-# ============ DÉMARRAGE ============
+# ============ DÉMARRAGE CORRIGÉ ============
 
 def run_flask():
-    """Lance le serveur Flask dans un thread séparé"""
     app.run(host=HOST, port=PORT, threaded=True)
 
-async def main():
-    """Fonction principale"""
+def main():
+    """Fonction principale synchrone"""
+    # Lancer Flask dans un thread
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
     
+    print(f"🚀 Serveur web démarré sur port {PORT}")
+    
+    # Créer la boucle asyncio et exécuter le bot
+    asyncio.run(run_bot())
+
+async def run_bot():
+    """Fonction async pour le bot"""
     application = Application.builder().token(BOT_TOKEN).build()
     
     application.add_handler(CommandHandler("start", start_command))
@@ -185,24 +169,23 @@ async def main():
         handle_channel_message
     ))
     
-    flask_thread = threading.Thread(target=run_flask)
-    flask_thread.daemon = True
-    flask_thread.start()
-    
-    print(f"🚀 Bot démarré sur le port {PORT}")
-    print(f"🎯 Canal source: {SOURCE_CHANNEL_ID}")
-    print(f"📤 Canal destination: {storage.get_dest_channel()}")
+    print(f"🤖 Bot Telegram démarré")
+    print(f"🎯 Source: {SOURCE_CHANNEL_ID}")
+    print(f"📤 Dest: {storage.get_dest_channel()}")
     
     await application.initialize()
     await application.start()
     await application.updater.start_polling(drop_pending_updates=True)
     
-    await asyncio.Event().wait()
+    # Garder le bot en vie
+    while True:
+        await asyncio.sleep(3600)
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        main()
     except KeyboardInterrupt:
-        print("\n🛑 Arrêt du bot...")
+        print("\n🛑 Arrêt...")
         storage.save_data()
         sys.exit(0)
+    
