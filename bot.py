@@ -28,9 +28,8 @@ class BotLogic:
         for category, data in analysis_data.items():
             gaps_str = str(data['gaps']) if len(str(data['gaps'])) < 50 else str(data['gaps'][:10]) + "..."
             message += f"""{data['emoji']} **{category}**
-            
 📊 Nombre: {data['count']} numéros 📏 Écarts: {gaps_str} 👉🏻 Max écart: {data['max_gap']}
-            
+
 """
         
         message += """🏆 **RÉCAPITULATIF DES MAX PAR CATÉGORIE** 🏆
@@ -117,4 +116,4 @@ class BotLogic:
 💾 Fichier données: `ecarts_data.json`
 📅 Journée active: {get_current_journee().replace('_', ' ')}
 """
-        
+            
