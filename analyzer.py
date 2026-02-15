@@ -61,4 +61,4 @@ class GapAnalyzer:
                 }
         
         return comparison
-      
+        
