@@ -29,7 +29,6 @@ parser = MessageParser()
 analyzer = GapAnalyzer()
 bot_logic = BotLogic(storage)
 
-# Cache pour le statut des canaux (évite de vérifier constamment)
 _channel_status_cache = {
     'source': None,
     'destination': None,
@@ -55,7 +54,6 @@ def home():
     status_emoji = "✅" if validation['valid'] else "❌"
     channels = get_channels_info()
     
-    # Afficher le statut cache si disponible
     source_status = "⏳ Non vérifié"
     dest_status = "⏳ Non vérifié"
     
@@ -137,13 +135,8 @@ async def check_bot_in_channel(bot, channel_id):
     Retourne: (success: bool, is_member: bool, error_message: str)
     """
     try:
-        # Essayer de récupérer les informations du canal
         chat = await bot.get_chat(channel_id)
-        
-        # Essayer de récupérer le statut du membre (bot)
         member = await bot.get_chat_member(channel_id, (await bot.get_me()).id)
-        
-        # Vérifier si le bot peut envoyer des messages
         can_send = member.status in ['administrator', 'member', 'creator']
         
         return True, can_send, None
@@ -165,7 +158,6 @@ async def update_channel_status_cache(bot):
     
     print("🔍 Vérification du statut des canaux...")
     
-    # Vérifier canal source
     success_src, is_member_src, error_src = await check_bot_in_channel(bot, SOURCE_CHANNEL_ID)
     if success_src:
         _channel_status_cache['source'] = is_member_src
@@ -174,7 +166,6 @@ async def update_channel_status_cache(bot):
         _channel_status_cache['source'] = False
         print(f"   Source {SOURCE_CHANNEL_ID}: ❌ ({error_src})")
     
-    # Vérifier canal destination
     success_dest, is_member_dest, error_dest = await check_bot_in_channel(bot, DESTINATION_CHANNEL_ID)
     if success_dest:
         _channel_status_cache['destination'] = is_member_dest
@@ -240,6 +231,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /intervalle <minutes> - Définir l'intervalle
 /auto <on/off> - Activer/désactiver l'envoi auto
 /envoyer - Forcer l'envoi immédiat
+/testenvoi - Tester l'envoi avec données fictives
 """
     
     welcome_msg += f"\n⏰ Envoi auto: **{storage.get_interval_minutes()}** min."
@@ -261,6 +253,10 @@ async def statut_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             last_send_str = str(last_send)
     
+    # Vérifier si on a des données
+    last_data = storage.get_last_parsed_data()
+    data_status = "✅ Données disponibles" if last_data else "❌ Aucune donnée reçue"
+    
     msg = f"""📊 **Configuration du Bot**
 
 🔐 **API:** Configurée (ID: `{API_ID}`)
@@ -270,6 +266,8 @@ async def statut_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 📺 **Canaux:**
 • Source: `{channels['source']}`
 • Destination: `{channels['destination']}`
+
+📊 **Données:** {data_status}
 
 ⚙️ **Paramètres:**
 • Intervalle: **{interval}** minutes
@@ -287,7 +285,6 @@ async def verifier_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     user_id = update.effective_user.id
     
-    # Seul l'admin peut vérifier (optionnel, vous pouvez autoriser tout le monde)
     if not is_admin(user_id):
         await update.message.reply_text(
             "⏳ Vérification des canaux en cours... (réservé admin)", 
@@ -301,12 +298,10 @@ async def verifier_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='Markdown'
     )
     
-    # Vérification en temps réel
     results = await update_channel_status_cache(context.bot)
     
     channels = get_channels_info()
     
-    # Formatage du résultat
     source_emoji = "✅" if results['source']['member'] else "❌"
     dest_emoji = "✅" if results['destination']['member'] else "❌"
     
@@ -342,14 +337,14 @@ async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'total_games': 60,
         'categories': {
             '3/2': [1330, 1342, 1352, 1361, 1366, 1370, 1374, 1375],
-            '3/3': [1322, 1323, 1325, 1329, 1332, 1335, 1337, 1338, 1340, 1349, 1350, 1351, 1353, 1354, 1355, 1356, 1357, 1358, 1359, 1362, 1363, 1369, 1372, 1377, 1378, 1379],
-            '2/2': [1321, 1324, 1326, 1327, 1328, 1331, 1336, 1339, 1341, 1345, 1346, 1348, 1367, 1368, 1373, 1376, 1380],
-            '2/3': [1333, 1334, 1343, 1344, 1347, 1360, 1364, 1365, 1371],
-            'Victoire Joueur': [1322, 1330, 1333, 1335, 1336, 1339, 1341, 1343, 1344, 1345, 1347, 1349, 1351, 1355, 1358, 1362, 1363, 1364, 1367, 1369, 1371, 1373, 1375, 1377, 1378, 1379, 1380],
-            'Victoire Banquier': [1321, 1323, 1325, 1326, 1327, 1328, 1329, 1331, 1334, 1337, 1338, 1340, 1342, 1346, 1348, 1350, 1352, 1353, 1356, 1357, 1359, 1360, 1361, 1365, 1366, 1370, 1374, 1376],
-            'Match Nul': [1324, 1332, 1354, 1368, 1372],
-            'Pair': [1321, 1323, 1324, 1326, 1327, 1331, 1332, 1334, 1335, 1337, 1338, 1340, 1341, 1344, 1348, 1349, 1350, 1353, 1354, 1357, 1359, 1362, 1365, 1367, 1368, 1369, 1370, 1372, 1376, 1377, 1378],
-            'Impair': [1322, 1325, 1328, 1329, 1330, 1333, 1336, 1339, 1342, 1343, 1345, 1346, 1347, 1351, 1352, 1355, 1356, 1358, 1360, 1361, 1363, 1364, 1366, 1371, 1373, 1374, 1375, 1379, 1380]
+            '3/3': [1322, 1323, 1325, 1329, 1332, 1335, 1337, 1338, 1340, 1349],
+            '2/2': [1321, 1324, 1326, 1327, 1328, 1331, 1336, 1339],
+            '2/3': [1333, 1334, 1343, 1344, 1347, 1360],
+            'Victoire Joueur': [1322, 1330, 1333, 1335, 1336],
+            'Victoire Banquier': [1321, 1323, 1325, 1326, 1327],
+            'Match Nul': [1324, 1332],
+            'Pair': [1321, 1323, 1324, 1326],
+            'Impair': [1322, 1325, 1328]
         }
     }
     
@@ -434,6 +429,7 @@ async def auto_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Usage: `/auto <on/off>`", parse_mode='Markdown')
 
 async def envoyer_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Force l'envoi immédiat du bilan vers DESTINATION_CHANNEL_ID"""
     user_id = update.effective_user.id
     
     if not is_admin(user_id):
@@ -441,21 +437,127 @@ async def envoyer_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     channels = get_channels_info()
+    
+    # Vérifier d'abord si on a des données
+    last_data = storage.get_last_parsed_data()
+    
+    if not last_data:
+        await update.message.reply_text(
+            f"""❌ **Aucune donnée disponible**
+
+📤 Impossible d'envoyer le bilan vers `{channels['destination']}`
+
+💡 **Raison:** Le bot n'a pas encore reçu de message "STATISTIQUES COMPLÈTES" du canal source.
+
+✅ **Solutions:**
+1. Attendez que le canal source `{channels['source']}` envoie des statistiques
+2. Utilisez `/test` pour voir un exemple de bilan
+3. Utilisez `/testenvoi` pour tester l'envoi avec des données fictives
+
+🔍 Vérifiez aussi: `/verifier` pour confirmer que le bot est dans les canaux""",
+            parse_mode='Markdown'
+        )
+        return
+    
+    # On a des données, procéder à l'envoi
     await update.message.reply_text(
-        f"📤 Envoi du bilan vers `{channels['destination']}`...", 
+        f"📤 Envoi du bilan vers `{channels['destination']}`...\n"
+        f"📊 Dernière donnée reçue: {last_data.get('timestamp', 'inconnue')[:16]}", 
         parse_mode='Markdown'
     )
     
     success = await send_bilan_to_destination(context)
     
     if success:
-        await update.message.reply_text("✅ Bilan envoyé!", parse_mode='Markdown')
+        await update.message.reply_text("✅ Bilan envoyé avec succès!", parse_mode='Markdown')
     else:
-        await update.message.reply_text("❌ Échec. Vérifiez que des données existent.", parse_mode='Markdown')
+        await update.message.reply_text(
+            """❌ **Échec de l'envoi**
+
+🔧 Causes possibles:
+• Bot retiré du canal destination
+• Canal destination inexistant ou inaccessible
+• Problème de réseau
+
+🔍 Faites `/verifier` pour diagnostiquer""",
+            parse_mode='Markdown'
+        )
+
+async def testenvoi_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Teste l'envoi avec des données fictives vers le canal destination"""
+    user_id = update.effective_user.id
+    
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ Commande réservée aux administrateurs.", parse_mode='Markdown')
+        return
+    
+    channels = get_channels_info()
+    
+    await update.message.reply_text(
+        f"🧪 **Test d'envoi vers** `{channels['destination']}`\n"
+        f"Utilisation de données fictives...", 
+        parse_mode='Markdown'
+    )
+    
+    # Créer des données de test
+    test_data = {
+        'total_games': 60,
+        'categories': {
+            '3/2': [1330, 1342, 1352, 1361, 1366, 1370, 1374, 1375],
+            '3/3': [1322, 1323, 1325, 1329, 1332, 1335, 1337, 1338, 1340, 1349],
+            '2/2': [1321, 1324, 1326, 1327, 1328, 1331, 1336, 1339],
+            '2/3': [1333, 1334, 1343, 1344, 1347, 1360],
+            'Victoire Joueur': [1322, 1330, 1333, 1335, 1336],
+            'Victoire Banquier': [1321, 1323, 1325, 1326, 1327],
+            'Match Nul': [1324, 1332],
+            'Pair': [1321, 1323, 1324, 1326],
+            'Impair': [1322, 1325, 1328]
+        }
+    }
+    
+    try:
+        analysis = analyzer.analyze_all_categories(test_data)
+        hour_str = datetime.now().strftime('%H:%M')
+        bilan_msg = bot_logic.format_bilan(analysis, test_data['total_games'], hour_str)
+        
+        # Envoyer au canal destination
+        await context.bot.send_message(
+            chat_id=DESTINATION_CHANNEL_ID,
+            text=bilan_msg + "\n\n🧪 *Message de test*", 
+            parse_mode='Markdown'
+        )
+        
+        await update.message.reply_text(
+            f"""✅ **Test réussi!**
+
+📤 Bilan de test envoyé vers `{channels['destination']}`
+
+✅ Le canal destination est accessible
+✅ Le bot a les permissions d'envoi
+
+📝 Prochaine étape: Attendez les vraies données du canal source `{channels['source']}`""",
+            parse_mode='Markdown'
+        )
+        
+    except Exception as e:
+        await update.message.reply_text(
+            f"""❌ **Test échoué**
+
+💥 Erreur: `{str(e)}`
+
+🔍 Causes possibles:
+• Bot non membre du canal destination
+• ID du canal incorrect
+• Canal inexistant
+
+💡 Faites `/verifier` pour diagnostiquer""",
+            parse_mode='Markdown'
+        )
 
 # ============ GESTION MESSAGES CANAL ============
 
 async def handle_channel_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Traite les messages du canal source configuré"""
     if not update.channel_post:
         return
     
@@ -464,18 +566,34 @@ async def handle_channel_message(update: Update, context: ContextTypes.DEFAULT_T
     
     message_text = update.channel_post.text
     
+    print(f"\n{'='*50}")
+    print(f"📥 MESSAGE REÇU à {datetime.now().strftime('%H:%M:%S')}")
+    print(f"📍 Canal: {update.channel_post.chat_id}")
+    print(f"📝 Début: {message_text[:100]}...")
+    print(f"{'='*50}\n")
+    
     if not message_text or 'STATISTIQUES COMPLÈTES' not in message_text:
+        print("❌ Message ignoré: ne contient pas 'STATISTIQUES COMPLÈTES'")
         return
     
-    print(f"📥 Message reçu du canal {SOURCE_CHANNEL_ID} à {datetime.now().strftime('%H:%M')}")
+    # DEBUG: Sauvegarder le message brut pour analyse
+    try:
+        with open('last_message_debug.txt', 'w', encoding='utf-8') as f:
+            f.write(message_text)
+        print("💾 Message sauvegardé dans last_message_debug.txt")
+    except Exception as e:
+        print(f"⚠️ Impossible de sauvegarder: {e}")
     
     parsed_data = parser.parse_message(message_text)
+    
     if not parsed_data:
-        print("⚠️ Message incomplet ou format non reconnu")
+        print("❌ ÉCHEC DU PARSING - Message incomplet ou format non reconnu")
+        print("💡 Vérifiez que toutes les catégories sont présentes dans le message")
         return
     
-    print(f"✅ {len(parsed_data['categories'])} catégories trouvées")
+    print(f"✅ PARSING RÉUSSI: {len(parsed_data['categories'])} catégories")
     
+    # Suite du traitement
     analysis = analyzer.analyze_all_categories(parsed_data)
     now = datetime.now()
     hour_str = now.strftime('%H:%M')
@@ -575,18 +693,19 @@ def main():
 async def run_bot():
     application = Application.builder().token(BOT_TOKEN).build()
     
-    # Commandes
+    # Commandes publiques
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("statut", statut_command))
-    application.add_handler(CommandHandler("verifier", verifier_command))  # NOUVEAU
+    application.add_handler(CommandHandler("verifier", verifier_command))
     application.add_handler(CommandHandler("test", test_command))
     application.add_handler(CommandHandler("historique", historique_command))
     application.add_handler(CommandHandler("restart", restart_command))
     
-    # Admin
+    # Commandes admin
     application.add_handler(CommandHandler("intervalle", intervalle_command))
     application.add_handler(CommandHandler("auto", auto_command))
     application.add_handler(CommandHandler("envoyer", envoyer_command))
+    application.add_handler(CommandHandler("testenvoi", testenvoi_command))
     
     # Handler canal source
     application.add_handler(MessageHandler(
