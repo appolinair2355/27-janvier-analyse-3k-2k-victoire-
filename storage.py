@@ -4,7 +4,7 @@ Gestion du stockage JSON des écarts
 import json
 import os
 from datetime import datetime
-from config import DATA_FILE, get_current_journee
+from config import DATA_FILE, get_current_journee, DEFAULT_INTERVAL_MINUTES
 
 class Storage:
     def __init__(self):
@@ -25,9 +25,10 @@ class Storage:
         return {
             'historique': {},
             'config': {
-                'source_channel': -1003309666471,
-                'dest_channel': -1003725380926,
-                'last_analysis': None
+                'last_analysis': None,
+                'interval_minutes': DEFAULT_INTERVAL_MINUTES,
+                'auto_send_enabled': True,
+                'last_auto_send': None
             }
         }
     
@@ -75,16 +76,39 @@ class Storage:
             journee = get_current_journee()
         return self.data['historique'].get(journee, {})
     
-    def set_dest_channel(self, channel_id):
-        """Définit le canal de destination"""
-        self.data['config']['dest_channel'] = channel_id
+    def get_interval_minutes(self):
+        """Récupère l'intervalle d'envoi en minutes"""
+        return self.data['config'].get('interval_minutes', DEFAULT_INTERVAL_MINUTES)
+    
+    def set_interval_minutes(self, minutes):
+        """Définit l'intervalle d'envoi en minutes"""
+        self.data['config']['interval_minutes'] = minutes
         self.save_data()
     
-    def get_dest_channel(self):
-        """Récupère le canal de destination"""
-        return self.data['config']['dest_channel']
+    def is_auto_send_enabled(self):
+        """Vérifie si l'envoi automatique est activé"""
+        return self.data['config'].get('auto_send_enabled', True)
     
-    def get_source_channel(self):
-        """Récupère le canal source"""
-        return self.data['config']['source_channel']
-          
+    def set_auto_send_enabled(self, enabled):
+        """Active/désactive l'envoi automatique"""
+        self.data['config']['auto_send_enabled'] = enabled
+        self.save_data()
+    
+    def get_last_auto_send(self):
+        """Récupère le timestamp du dernier envoi automatique"""
+        return self.data['config'].get('last_auto_send')
+    
+    def update_last_auto_send(self):
+        """Met à jour le timestamp du dernier envoi automatique"""
+        self.data['config']['last_auto_send'] = datetime.now().isoformat()
+        self.save_data()
+    
+    def get_last_parsed_data(self):
+        """Récupère les dernières données parsées pour l'envoi automatique"""
+        journee = get_current_journee()
+        if journee in self.data['historique']:
+            hours = sorted(self.data['historique'][journee].keys())
+            if hours:
+                last_hour = hours[-1]
+                return self.data['historique'][journee][last_hour]
+        return None
