@@ -66,4 +66,3 @@ class MessageParser:
                 numbers.extend([int(n) for n in nums])
         
         return numbers if numbers else None
-      
