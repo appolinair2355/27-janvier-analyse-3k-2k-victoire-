@@ -604,7 +604,7 @@ async def handle_channel_message(update: Update, context: ContextTypes.DEFAULT_T
     if previous_data:
         comparison = analyzer.compare_with_previous(analysis, previous_data)
     
-    gaps_data = {cat: {'max_gap': data['max_gap'], 'gaps': data['gaps']} 
+    gaps_data = {cat: {'max_gap': data['max_gap'], 'gaps': data['gaps'], 'max_gap_pair': data.get('max_gap_pair')} 
                  for cat, data in analysis.items()}
     storage.save_analysis(hour_key, gaps_data)
     

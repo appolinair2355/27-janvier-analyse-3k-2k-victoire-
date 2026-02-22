@@ -38,17 +38,23 @@ class Storage:
             json.dump(self.data, f, ensure_ascii=False, indent=2)
     
     def save_analysis(self, hour, gaps_data):
-        """Sauvegarde une analyse d'heure"""
+        """Sauvegarde une analyse d'heure.
+        Fusionne avec les données existantes : les nouvelles données prennent
+        la priorité, mais les catégories absentes du nouveau message sont conservées.
+        """
         journee = get_current_journee()
-        
+
         if journee not in self.data['historique']:
             self.data['historique'][journee] = {}
-        
+
+        existing_gaps = self.data['historique'][journee].get(hour, {}).get('gaps', {})
+        merged_gaps = {**existing_gaps, **gaps_data}
+
         self.data['historique'][journee][hour] = {
             'timestamp': datetime.now().isoformat(),
-            'gaps': gaps_data
+            'gaps': merged_gaps
         }
-        
+
         self.data['config']['last_analysis'] = datetime.now().isoformat()
         self.save_data()
     

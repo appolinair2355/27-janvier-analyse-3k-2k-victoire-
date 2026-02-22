@@ -26,27 +26,22 @@ class BotLogic:
     def format_bilan(self, analysis, total_games, hour_str, comparison=None):
         """Formate le bilan des écarts"""
         lines = [
-            "🌸 **BILAN DES ÉCARTS** 🌸",
+            "🌸 BILAN DES ÉCARTS 🌸",
             f"⏰ {hour_str} | 🎲 {total_games} jeux",
             ""
         ]
-        
-        # Ajouter chaque catégorie
+
         for category_name, data in analysis.items():
             emoji = data['emoji']
             max_gap = data['max_gap']
-            count = data['count']
-            lines.append(f"{emoji} **{category_name}** → Écart max: **{max_gap}** ({count} tirages)")
-        
-        # Ajouter comparaison si disponible
-        if comparison:
-            lines.append("")
-            lines.append("📈 **Évolution vs précédent:**")
-            increased = sum(1 for v in comparison.values() if v['status'] == 'increased')
-            decreased = sum(1 for v in comparison.values() if v['status'] == 'decreased')
-            same = sum(1 for v in comparison.values() if v['status'] == 'same')
-            lines.append(f"↗️ {increased} en hausse | ↘️ {decreased} en baisse | ➡️ {same} stable")
-        
+            alert = ""
+            if comparison and category_name in comparison:
+                cmp = comparison[category_name]
+                if cmp['status'] == 'increased':
+                    diff = cmp['current_max'] - cmp['previous_max']
+                    alert = f" 💥 +{diff}"
+            lines.append(f"{emoji} {category_name} : {max_gap}{alert}")
+
         return "\n".join(lines)
     
     def format_historique(self):
@@ -67,9 +62,17 @@ class BotLogic:
             data = historique[hour]
             gaps = data.get('gaps', {})
             total_categories = len(gaps)
-            max_gaps = [str(v.get('max_gap', 0)) for v in gaps.values()]
-            lines.append(f"🕐 **{hour}** - {total_categories} catégories")
-            lines.append(f"   Écarts max: {', '.join(max_gaps[:5])}{'...' if len(max_gaps) > 5 else ''}")
+            lines.append(f"🕐 **{hour}** — {total_categories} catégories")
+            for cat_name, cat_data in gaps.items():
+                emoji = CATEGORIES.get(cat_name, {}).get('emoji', '⚪')
+                max_gap = cat_data.get('max_gap', 0)
+                pair = cat_data.get('max_gap_pair')
+                if pair and len(pair) == 2:
+                    pair_str = f" (#N{pair[0]} → #N{pair[1]})"
+                else:
+                    pair_str = ""
+                lines.append(f"  {emoji} {cat_name} : {max_gap}{pair_str}")
+            lines.append("")
         
         return "\n".join(lines)
     

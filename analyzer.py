@@ -14,7 +14,7 @@ class GapAnalyzer:
         results = {}
         
         for category_name, numbers in data['categories'].items():
-            gaps, max_gap = self.calculate_gaps(numbers)
+            gaps, max_gap, max_gap_pair = self.calculate_gaps(numbers)
             emoji = CATEGORIES[category_name]['emoji']
             
             results[category_name] = {
@@ -22,7 +22,8 @@ class GapAnalyzer:
                 'numbers': numbers,
                 'count': len(numbers),
                 'gaps': gaps,
-                'max_gap': max_gap
+                'max_gap': max_gap,
+                'max_gap_pair': max_gap_pair
             }
         
         return results
@@ -30,11 +31,13 @@ class GapAnalyzer:
     def calculate_gaps(self, numbers):
         """Calcule les écarts entre numéros consécutifs"""
         if len(numbers) < 2:
-            return [], 0
+            return [], 0, None
         
         gaps = [numbers[i+1] - numbers[i] for i in range(len(numbers)-1)]
         max_gap = max(gaps) if gaps else 0
-        return gaps, max_gap
+        max_idx = gaps.index(max_gap)
+        max_gap_pair = (numbers[max_idx], numbers[max_idx + 1])
+        return gaps, max_gap, max_gap_pair
     
     def compare_with_previous(self, current_data, previous_data):
         """
