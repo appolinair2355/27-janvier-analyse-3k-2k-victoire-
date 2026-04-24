@@ -10,7 +10,7 @@ from datetime import datetime
 
 API_ID = 29177661
 API_HASH = "a8639172fa8d35dbfd8ea46286d349ab"
-BOT_TOKEN = "7928036679:AAGJyBYLy7FPPTNBygP_pqXjIXVMNOpYPJk"
+BOT_TOKEN = "7815360317:AAGsrFzeUZrHOjujf5aY2UjlBj4GOblHSig"
 
 # ==========================================
 # CONFIGURATION DES CANAUX (OBLIGATOIRE)
